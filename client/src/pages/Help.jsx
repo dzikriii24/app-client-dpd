@@ -15,11 +15,9 @@ export default function Help() {
                     <h3 className="font-bold text-slate-800 mb-2">Kontak Darurat</h3>
                     <p className="text-sm text-slate-500 mb-4">Hubungi nomor berikut jika terjadi kendala aplikasi:</p>
                     <a href="tel:081234567890" className="flex items-center gap-3 text-red-600 font-bold bg-red-50 p-3 rounded-lg mb-2">
-                        <Phone size={18} /> 0812-3456-7890 (IT Support)
+                        <Phone size={18} /> 0851-5629-6580 (IT Support)
                     </a>
-                    <a href="mailto:admin@kantor.com" className="flex items-center gap-3 text-slate-600 font-medium bg-slate-50 p-3 rounded-lg">
-                        <Mail size={18} /> admin@kantor.com
-                    </a>
+                    
                 </div>
             </div>
         </div>

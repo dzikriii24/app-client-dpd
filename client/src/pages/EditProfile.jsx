@@ -1,13 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, User } from 'lucide-react';
+import { ArrowLeft, Save, User, Camera } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function EditProfile() {
     const navigate = useNavigate();
     const [user, setUser] = useState(JSON.parse(localStorage.getItem('user_data') || '{}'));
     const [nama, setNama] = useState(user.nama || '');
+    const [foto, setFoto] = useState(null); // State untuk foto baru (Base64)
+    const [preview, setPreview] = useState(user.foto_profil ? `${API_BASE_URL}${user.foto_profil}` : null);
     const [loading, setLoading] = useState(false);
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFoto(reader.result); // Simpan base64 untuk dikirim
+                setPreview(reader.result); // Tampilkan preview
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleSave = async (e) => {
         e.preventDefault();
@@ -16,12 +30,16 @@ export default function EditProfile() {
             const res = await fetch(`${API_BASE_URL}/api/users/${user.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nama })
+                body: JSON.stringify({ nama, foto_profil: foto })
             });
             const data = await res.json();
             if (data.status === 'success') {
                 // Update localStorage
-                const newUser = { ...user, nama };
+                const newUser = { 
+                    ...user, 
+                    nama, 
+                    foto_profil: data.data?.foto_profil || user.foto_profil 
+                };
                 localStorage.setItem('user_data', JSON.stringify(newUser));
                 alert('Profil berhasil diperbarui!');
                 navigate('/profile');
@@ -44,8 +62,18 @@ export default function EditProfile() {
             <div className="p-6">
                 <form onSubmit={handleSave} className="space-y-6">
                     <div className="flex justify-center mb-6">
-                         <div className="w-24 h-24 bg-slate-200 rounded-full overflow-hidden border-4 border-white shadow-md">
-                            <img src={`https://ui-avatars.com/api/?name=${nama.replace(' ', '+')}&background=ef4444&color=fff`} alt="Profile" className="w-full h-full object-cover" />
+                         <div className="relative w-28 h-28">
+                            <div className="w-full h-full bg-slate-200 rounded-full overflow-hidden border-4 border-white shadow-md">
+                                <img 
+                                    src={preview || `https://ui-avatars.com/api/?name=${nama.replace(' ', '+')}&background=ef4444&color=fff`} 
+                                    alt="Profile" 
+                                    className="w-full h-full object-cover" 
+                                />
+                            </div>
+                            <label className="absolute bottom-0 right-0 bg-slate-800 text-white p-2 rounded-full cursor-pointer hover:bg-slate-700 shadow-lg border-2 border-white">
+                                <Camera size={16} />
+                                <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                            </label>
                         </div>
                     </div>
 

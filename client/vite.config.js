@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate', 
       includeAssets: ['logodpd/favicon.ico', 'logodpd/apple-touch-icon.png', 'logodpd/mask-icon.svg'],
       manifest: {
-        name: 'Portal Absensi Petugas',
-        short_name: 'Absensi',
-        description: 'Aplikasi Absensi Petugas Keamanan',
+        name: 'Absensi DPD JawaBarat',
+        short_name: 'Absensi DPD',
+        description: 'Aplikasi Absensi DPD JawaBarat',
         theme_color: '#dc2626',
         background_color: '#ffffff',
         display: 'standalone',

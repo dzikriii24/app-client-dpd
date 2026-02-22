@@ -14,7 +14,7 @@ export default function About() {
                 <div className="w-20 h-20 bg-red-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-red-200 transform rotate-3">
                     <ShieldCheck size={40} />
                 </div>
-                <h2 className="text-xl font-bold text-slate-800">Portal Petugas</h2>
+                <h2 className="text-xl font-bold text-slate-800">Absensi DPD Jawa Barat</h2>
                 <p className="text-slate-400 text-xs mt-1 font-mono">Versi 1.0.0 (Beta)</p>
                 <p className="text-slate-500 text-sm mt-6 leading-relaxed">
                     Aplikasi absensi dan pelaporan digital untuk petugas keamanan. Dikembangkan untuk meningkatkan efisiensi operasional lapangan.

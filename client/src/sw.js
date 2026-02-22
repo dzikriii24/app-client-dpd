@@ -18,13 +18,14 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body,
     icon: '/logodpd/android-chrome-192x192.png', // Logo Besar
-    badge: '/logodpd/android-chrome-192x192.png', // Logo Kecil di Status Bar (Harus transparan/putih idealnya, tapi png oke)
+    badge: '/logodpd/android-chrome-192x192.png', // Logo Kecil di Status Bar
     vibrate: [100, 50, 100], // Getar: Bzz-bz-Bzz
     data: {
       url: data.url || '/'
     }
   }
 
+  // Tampilkan notifikasi TANPA KONDISI (Selalu muncul baik app dibuka/tutup)
   event.waitUntil(
     self.registration.showNotification(data.title, options)
   )

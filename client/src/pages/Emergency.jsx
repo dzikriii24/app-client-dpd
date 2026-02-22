@@ -1,7 +1,7 @@
 // c:\Users\dzikri\Downloads\absensi-app-user\client\src\pages\Emergency.jsx
 
 import React, { useState } from 'react';
-import { AlertTriangle, Camera, Send, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Camera, Send, ArrowLeft, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
@@ -10,6 +10,7 @@ export default function Emergency() {
   const [laporan, setLaporan] = useState("");
   const [foto, setFoto] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState(null); // State untuk preview foto
 
   const handleFileChange = (e) => {
       const file = e.target.files[0];
@@ -24,9 +25,10 @@ export default function Emergency() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // 1. CEGAH DOUBLE SUBMIT
     if(!laporan) return alert("Isi keterangan kejadian!");
     
-    setLoading(true);
+    setLoading(true); // Kunci tombol
     const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
 
     try {
@@ -36,9 +38,9 @@ export default function Emergency() {
             body: JSON.stringify({
                 user_id: userData.id,
                 tanggal: new Date().toISOString().split('T')[0],
-                isi_laporan: `[DARURAT] ${laporan}`, // Tandai sebagai darurat di teks
+                isi_laporan: `[DARURAT] ${laporan}`,
                 checklist_json: { type: 'EMERGENCY' },
-                foto_bukti: foto // Kirim foto asli
+                foto_bukti: foto
             })
         });
         alert("🚨 Laporan Darurat Terkirim! Tim pusat akan segera merespons.");
@@ -46,11 +48,21 @@ export default function Emergency() {
     } catch (error) {
         alert("Gagal mengirim laporan.");
     }
-    setLoading(false);
+    setLoading(false); // Buka kunci (jika gagal)
   };
 
   return (
     <div className="min-h-screen bg-red-50 pb-32">
+      {/* MODAL PREVIEW FOTO (ZOOM) */}
+      {previewPhoto && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewPhoto(null)}>
+            <button className="absolute top-4 right-4 text-white p-2 bg-white/20 rounded-full">
+                <X size={24} />
+            </button>
+            <img src={previewPhoto} alt="Preview Besar" className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+        </div>
+      )}
+
       {/* Header Merah */}
       <div className="bg-red-600 p-6 pt-10 pb-16 rounded-b-[2.5rem] relative">
         <button onClick={() => navigate(-1)} className="absolute top-10 left-6 text-white/80 hover:text-white">
@@ -88,7 +100,12 @@ export default function Emergency() {
                     </label>
                 ) : (
                     <div className="relative w-full h-48 rounded-xl overflow-hidden border border-red-200">
-                        <img src={foto} alt="Preview" className="w-full h-full object-cover" />
+                        <img 
+                            src={foto} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover cursor-pointer" 
+                            onClick={() => setPreviewPhoto(foto)} // 2. KLIK UNTUK PREVIEW
+                        />
                         <button 
                             type="button"
                             onClick={() => setFoto(null)}
@@ -102,8 +119,8 @@ export default function Emergency() {
 
             <button 
                 type="submit" 
-                disabled={loading}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                disabled={loading} // 3. TOMBOL MATI SAAT LOADING
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
                 {loading ? 'Mengirim...' : (
                     <>

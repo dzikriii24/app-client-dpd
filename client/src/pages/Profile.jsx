@@ -46,7 +46,11 @@ export default function Profile() {
             {/* Foto Profil */}
             <div className="relative">
                 <div className="w-24 h-24 bg-slate-200 rounded-full overflow-hidden border-4 border-slate-50 shadow-md">
-                    <img src={`https://ui-avatars.com/api/?name=${user.nama.replace(' ', '+')}&background=ef4444&color=fff&font-size=0.33`} alt="Profile" className="w-full h-full object-cover" />
+                    <img 
+                        src={user.foto_profil ? `${API_BASE_URL}${user.foto_profil}` : `https://ui-avatars.com/api/?name=${user.nama.replace(' ', '+')}&background=ef4444&color=fff&font-size=0.33`} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover" 
+                    />
                 </div>
                 <div className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-500 border-4 border-white rounded-full flex items-center justify-center">
                     <User size={14} className="text-white" />

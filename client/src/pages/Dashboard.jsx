@@ -1,7 +1,7 @@
 // c:\Users\dzikri\Downloads\absensi-app-user\client\src\pages\Dashboard.jsx
 
 import React, { useEffect, useState } from 'react';
-import { MapPin, Clock, CalendarCheck, FileText, Camera, CheckSquare, AlertTriangle, Upload, BellRing } from 'lucide-react';
+import { MapPin, Clock, CalendarCheck, FileText, Camera, CheckSquare, AlertTriangle, Upload, BellRing, X, ZoomIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [shiftEndTime, setShiftEndTime] = useState("");
   const [hasSubmittedReport, setHasSubmittedReport] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false); // State untuk cegah double submit
+  const [previewPhoto, setPreviewPhoto] = useState(null); // State untuk preview foto besar
 
   // GANTI DENGAN PUBLIC KEY DARI TERMINAL (Langkah 1)
   const publicVapidKey = 'BHPiVWZRGOAbki8WcDeQseoWHdbzE26wv9Ce00wccvrViehc2o2QqtHLdbDaq0ggVL9nhY1Pb6IrMyxKZ6fZiaE';
@@ -61,8 +63,11 @@ export default function Dashboard() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId, subscription })
             });
+            
+            alert("✅ Notifikasi berhasil diaktifkan!");
         } catch (err) {
             console.error("Gagal subscribe push:", err);
+            alert("Gagal mengaktifkan notifikasi. Pastikan izin diberikan.");
         }
     }
   };
@@ -126,9 +131,6 @@ export default function Dashboard() {
                     setUnreadCount(data.data.filter(n => !n.is_read).length);
                 }
             });
-        
-        // Jalankan Subscribe Push Notification
-        subscribeToPush(userData.id);
       }
   }, [navigate, currentTime]);
 
@@ -150,6 +152,8 @@ export default function Dashboard() {
 
   const handleSubmitLaporan = async (e) => {
       e.preventDefault();
+      if (isSubmitting) return; // 1. CEGAH DOUBLE SUBMIT
+      setIsSubmitting(true); // Kunci tombol
       
       // Kirim ke DB
       try {
@@ -164,14 +168,17 @@ export default function Dashboard() {
                 foto_bukti: foto // Kirim string Base64 foto asli
             })
         });
+        
+        alert("Laporan Harian Berhasil Dikirim!");
+        localStorage.setItem('daily_report_date', new Date().toLocaleDateString('id-ID'));
+        setHasSubmittedReport(true);
+
       } catch (err) {
           console.error(err);
+          alert("Gagal mengirim laporan. Coba lagi.");
+      } finally {
+          setIsSubmitting(false); // Buka kunci tombol
       }
-
-      alert("Laporan Harian Berhasil Dikirim!");
-      
-      localStorage.setItem('daily_report_date', new Date().toLocaleDateString('id-ID'));
-      setHasSubmittedReport(true);
   };
 
   // Data default jika belum absen (biar ga error)
@@ -188,6 +195,16 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 pb-32">
       
+      {/* MODAL PREVIEW FOTO */}
+      {previewPhoto && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewPhoto(null)}>
+            <button className="absolute top-4 right-4 text-white p-2 bg-white/20 rounded-full">
+                <X size={24} />
+            </button>
+            <img src={previewPhoto} alt="Preview Besar" className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+        </div>
+      )}
+      
       {/* 1. Header */}
       <div className="bg-red-700 pt-10 pb-20 px-6 rounded-b-[2.5rem] relative">
         <div className="flex items-center gap-3">
@@ -201,7 +218,18 @@ export default function Dashboard() {
                     <span className="text-xs bg-red-800 px-2 py-0.5 rounded text-red-100">{displayData.role}</span>
                     
                     {/* Tombol Notifikasi di Header (Pojok Kanan) */}
-                    <button onClick={() => navigate('/notifications')} className="bg-red-800 p-1.5 rounded-full text-red-100 hover:bg-red-900 relative">
+                    <button 
+                        onClick={() => {
+                            // Cek izin dulu, kalau belum granted, minta izin (Subscribe)
+                            if (Notification.permission !== 'granted') {
+                                const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+                                if(userData.id) subscribeToPush(userData.id);
+                            } else {
+                                navigate('/notifications');
+                            }
+                        }} 
+                        className="bg-red-800 p-1.5 rounded-full text-red-100 hover:bg-red-900 relative"
+                    >
                         <BellRing size={12} />
                         {unreadCount > 0 && (
                             <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full border border-red-700">{unreadCount}</span>
@@ -335,8 +363,13 @@ export default function Dashboard() {
                             <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                         </label>
                     ) : (
-                        <div className="relative w-full h-48 rounded-lg overflow-hidden">
-                            <img src={foto} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="relative w-full h-48 rounded-lg overflow-hidden group">
+                            <img 
+                                src={foto} 
+                                alt="Preview" 
+                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                                onClick={() => setPreviewPhoto(foto)} // 2. KLIK UNTUK PREVIEW
+                            />
                             <button 
                                 type="button"
                                 onClick={() => setFoto(null)}
@@ -344,13 +377,26 @@ export default function Dashboard() {
                             >
                                 <AlertTriangle size={16} />
                             </button>
+                            <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded pointer-events-none">
+                                Tap untuk perbesar
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <Upload size={18} />
-                    Kirim Laporan
+                <button 
+                    type="submit" 
+                    disabled={isSubmitting} // 3. TOMBOL MATI SAAT LOADING
+                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                    {isSubmitting ? (
+                        <>Memproses...</>
+                    ) : (
+                        <>
+                            <Upload size={18} />
+                            Kirim Laporan
+                        </>
+                    )}
                 </button>
             </form>
             </>

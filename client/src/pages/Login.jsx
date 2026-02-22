@@ -109,7 +109,7 @@ export default function Login() {
           <div className="bg-red-600 text-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-red-200 mb-4 transform rotate-3">
             <ShieldCheck size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Portal Petugas</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Absensi DPD Jawa Barat</h1>
           <p className="text-slate-500 text-sm mt-2">Silakan masuk untuk memulai shift.</p>
         </div>
 

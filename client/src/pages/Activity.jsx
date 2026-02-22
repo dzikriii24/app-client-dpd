@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronDown, ChevronUp, FileText, Clock, CheckCircle, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp, FileText, Clock, CheckCircle, Image as ImageIcon, AlertTriangle, X, Edit, Save, Camera, CheckSquare, Printer } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function Activity() {
@@ -8,6 +8,13 @@ export default function Activity() {
   const [riwayatLaporan, setRiwayatLaporan] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  const [previewPhoto, setPreviewPhoto] = useState(null); // State Preview Foto
+  const [editingReport, setEditingReport] = useState(null); // State Laporan yg diedit
+  const [editKeterangan, setEditKeterangan] = useState(""); // State Text Edit
+  const [editChecklist, setEditChecklist] = useState({}); // State Checklist Edit
+  const [editFoto, setEditFoto] = useState(null); // State Foto Edit
+  const [isSaving, setIsSaving] = useState(false); // Loading Simpan
 
   // Ambil data user dari localStorage
   const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
@@ -44,6 +51,68 @@ export default function Activity() {
       setExpandedId(expandedId === id ? null : id);
   };
 
+  const handleEditClick = (laporan) => {
+      setEditingReport(laporan);
+      setEditKeterangan(laporan.isi_laporan || "");
+      setEditChecklist({
+          patroli: laporan.checklist_json?.patroli || false,
+          parkir: laporan.checklist_json?.parkir || false,
+          tamu: laporan.checklist_json?.tamu || false,
+          kebersihan: laporan.checklist_json?.kebersihan || false,
+          ...laporan.checklist_json // preserve other keys like type: EMERGENCY
+      });
+      setEditFoto(laporan.foto_bukti);
+  };
+
+  const handleEditChecklistChange = (e) => {
+      setEditChecklist({ ...editChecklist, [e.target.name]: e.target.checked });
+  };
+
+  const handleEditFileChange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => setEditFoto(reader.result);
+          reader.readAsDataURL(file);
+      }
+  };
+
+  const handleSaveEdit = async () => {
+      if (!editingReport) return;
+      setIsSaving(true);
+      try {
+          const res = await fetch(`${API_BASE_URL}/api/laporan/${editingReport.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  isi_laporan: editKeterangan,
+                  checklist_json: editChecklist,
+                  foto_bukti: editFoto
+              })
+          });
+          const data = await res.json();
+          if (data.status === 'success') {
+              setRiwayatLaporan(prev => prev.map(item => item.id === editingReport.id ? { 
+                  ...item, 
+                  isi_laporan: editKeterangan,
+                  checklist_json: editChecklist,
+                  foto_bukti: data.data?.foto_bukti || editFoto 
+              } : item));
+              setEditingReport(null);
+              alert("✅ Laporan berhasil diperbarui!");
+          } else {
+              alert("Gagal update: " + data.message);
+          }
+      } catch (err) {
+          alert("Terjadi kesalahan koneksi.");
+      }
+      setIsSaving(false);
+  };
+
+  const handlePrint = () => {
+      window.print();
+  };
+
   if (loading) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-slate-50 pb-24">
@@ -54,10 +123,97 @@ export default function Activity() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-32">
+      
+      {/* MODAL PREVIEW FOTO */}
+      {previewPhoto && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewPhoto(null)}>
+            <button className="absolute top-4 right-4 text-white p-2 bg-white/20 rounded-full">
+                <X size={24} />
+            </button>
+            <img src={previewPhoto} alt="Preview Besar" className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" />
+        </div>
+      )}
+
+      {/* MODAL EDIT LAPORAN */}
+      {editingReport && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-200">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg text-slate-800">Edit Laporan</h3>
+                    <button onClick={() => setEditingReport(null)} className="p-1 hover:bg-slate-100 rounded-full">
+                        <X size={20} className="text-slate-400" />
+                    </button>
+                </div>
+                
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    {/* 1. Edit Checklist */}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-2">Ceklis Kegiatan</p>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="patroli" checked={editChecklist.patroli} onChange={handleEditChecklistChange} className="accent-red-600 w-4 h-4" /><span className="text-sm text-slate-700">Patroli Keliling</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="parkir" checked={editChecklist.parkir} onChange={handleEditChecklistChange} className="accent-red-600 w-4 h-4" /><span className="text-sm text-slate-700">Pengaturan Parkir</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="tamu" checked={editChecklist.tamu} onChange={handleEditChecklistChange} className="accent-red-600 w-4 h-4" /><span className="text-sm text-slate-700">Pencatatan Tamu</span></label>
+                            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="kebersihan" checked={editChecklist.kebersihan} onChange={handleEditChecklistChange} className="accent-red-600 w-4 h-4" /><span className="text-sm text-slate-700">Cek Kebersihan</span></label>
+                        </div>
+                    </div>
+
+                    {/* 2. Edit Keterangan */}
+                    <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Keterangan</p>
+                        <textarea
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500/20 min-h-[100px] text-sm"
+                            value={editKeterangan}
+                            onChange={(e) => setEditKeterangan(e.target.value)}
+                            placeholder="Perbarui keterangan laporan..."
+                        ></textarea>
+                    </div>
+
+                    {/* 3. Edit Foto */}
+                    <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase mb-1">Foto Bukti</p>
+                        <div className="relative w-full h-32 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 group">
+                            {editFoto ? (
+                                <img 
+                                    src={editFoto.startsWith('data:') || editFoto.startsWith('http') ? editFoto : `${API_BASE_URL}${editFoto}`} 
+                                    alt="Preview Edit" 
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-slate-400 text-xs">Belum ada foto</div>
+                            )}
+                            <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white font-bold text-xs">
+                                <Camera size={20} className="mr-1" /> Ganti Foto
+                                <input type="file" className="hidden" accept="image/*" onChange={handleEditFileChange} />
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2">
+                    <button onClick={() => setEditingReport(null)} className="px-4 py-2 text-slate-500 font-medium hover:bg-slate-50 rounded-lg">Batal</button>
+                    <button 
+                        onClick={handleSaveEdit} 
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:bg-slate-300"
+                    >
+                        {isSaving ? 'Menyimpan...' : <><Save size={16} /> Simpan</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="bg-white pt-12 pb-4 px-6 sticky top-0 z-10 shadow-sm border-b border-slate-100">
-        <h1 className="text-2xl font-bold text-slate-800">Aktivitas Saya</h1>
-        <p className="text-slate-500 text-xs mt-1">Riwayat kehadiran dan laporan harian</p>
+      <div className="bg-white pt-12 pb-4 px-6 sticky top-0 z-10 shadow-sm border-b border-slate-100 no-print">
+        <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-800">Aktivitas Saya</h1>
+                <p className="text-slate-500 text-xs mt-1">Riwayat kehadiran dan laporan harian</p>
+            </div>
+            <button onClick={handlePrint} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-600">
+                <Printer size={20} />
+            </button>
+        </div>
         
         {/* Tabs */}
         <div className="flex mt-6 bg-slate-100 p-1 rounded-xl">
@@ -76,13 +232,20 @@ export default function Activity() {
         </div>
       </div>
 
+      {/* Header Khusus Print */}
+      <div className="hidden print:block p-6 text-center border-b border-black mb-4">
+          <h1 className="text-xl font-bold uppercase">Laporan {activeTab === 'absensi' ? 'Absensi' : 'Harian'} Petugas</h1>
+          <p className="text-sm">{userData.nama} - NIP. {userData.nip}</p>
+          <p className="text-xs mt-1">Dicetak pada: {new Date().toLocaleString('id-ID')}</p>
+      </div>
+
       <div className="p-6 space-y-4">
         
         {/* TAB RIWAYAT ABSENSI */}
         {activeTab === 'absensi' && (
             <>
                 {riwayatAbsen.length === 0 && (
-                    <div className="text-center py-10">
+                    <div className="text-center py-10 print:hidden">
                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Calendar size={32} className="text-slate-300" />
                         </div>
@@ -90,6 +253,8 @@ export default function Activity() {
                     </div>
                 )}
                 
+                {/* TAMPILAN MOBILE / WEB (CARD) - HIDDEN SAAT PRINT */}
+                <div className="space-y-4 print:hidden">
                 {riwayatAbsen.map((item) => (
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                         <div 
@@ -142,6 +307,39 @@ export default function Activity() {
                         )}
                     </div>
                 ))}
+                </div>
+
+                {/* TAMPILAN CETAK (TABEL) - HANYA MUNCUL SAAT PRINT */}
+                <div className="hidden print:block">
+                    <table className="w-full text-sm border-collapse border border-black">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                <th className="border border-black p-2 text-left">No</th>
+                                <th className="border border-black p-2 text-left">Tanggal</th>
+                                <th className="border border-black p-2 text-left">Jam Masuk</th>
+                                <th className="border border-black p-2 text-left">Jam Pulang</th>
+                                <th className="border border-black p-2 text-left">Shift</th>
+                                <th className="border border-black p-2 text-left">Status</th>
+                                <th className="border border-black p-2 text-left">Lokasi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {riwayatAbsen.map((item, index) => (
+                                <tr key={item.id}>
+                                    <td className="border border-black p-2 text-center">{index + 1}</td>
+                                    <td className="border border-black p-2">{new Date(item.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                                    <td className="border border-black p-2">{item.jam_masuk ? item.jam_masuk.substring(0, 5) : '-'}</td>
+                                    <td className="border border-black p-2">{item.jam_pulang ? item.jam_pulang.substring(0, 5) : '-'}</td>
+                                    <td className="border border-black p-2">{item.shift || '-'}</td>
+                                    <td className="border border-black p-2">
+                                        {item.status} {item.is_late ? '(Terlambat)' : ''}
+                                    </td>
+                                    <td className="border border-black p-2">{item.lokasi || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </>
         )}
 
@@ -149,7 +347,7 @@ export default function Activity() {
         {activeTab === 'laporan' && (
             <>
                 {riwayatLaporan.length === 0 && (
-                    <div className="text-center py-10">
+                    <div className="text-center py-10 print:hidden">
                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <FileText size={32} className="text-slate-300" />
                         </div>
@@ -157,9 +355,11 @@ export default function Activity() {
                     </div>
                 )}
 
+                {/* TAMPILAN MOBILE / WEB (CARD) - HIDDEN SAAT PRINT */}
+                <div className="space-y-4 print:hidden">
                 {riwayatLaporan.map((laporan) => (
                     <div key={laporan.id} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-4">
+                        <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${laporan.checklist_json?.type === 'EMERGENCY' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
                                     {laporan.checklist_json?.type === 'EMERGENCY' ? <AlertTriangle size={20} /> : <FileText size={20} />}
@@ -178,9 +378,15 @@ export default function Activity() {
                                     </div>
                                 </div>
                             </div>
-                            {laporan.checklist_json?.type === 'EMERGENCY' && (
-                                <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">DARURAT</span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {laporan.checklist_json?.type === 'EMERGENCY' && (
+                                    <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">DARURAT</span>
+                                )}
+                                {/* Tombol Edit */}
+                                <button onClick={() => handleEditClick(laporan)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                    <Edit size={16} />
+                                </button>
+                            </div>
                         </div>
                         
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
@@ -216,6 +422,7 @@ export default function Activity() {
                                         src={laporan.foto_bukti.startsWith('data:') || laporan.foto_bukti.startsWith('http') ? laporan.foto_bukti : `${API_BASE_URL}${laporan.foto_bukti}`} 
                                         alt="Bukti Laporan" 
                                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                                        onClick={() => setPreviewPhoto(laporan.foto_bukti.startsWith('data:') || laporan.foto_bukti.startsWith('http') ? laporan.foto_bukti : `${API_BASE_URL}${laporan.foto_bukti}`)}
                                         onError={(e) => {e.target.src = 'https://placehold.co/600x400?text=Gagal+Muat+Gambar';}}
                                     />
                                 </div>
@@ -223,10 +430,70 @@ export default function Activity() {
                         )}
                     </div>
                 ))}
+                </div>
+
+                {/* TAMPILAN CETAK (TABEL) - HANYA MUNCUL SAAT PRINT */}
+                <div className="hidden print:block">
+                    <table className="w-full text-sm border-collapse border border-black">
+                        <thead>
+                            <tr className="bg-gray-100">
+                                <th className="border border-black p-2 text-left">No</th>
+                                <th className="border border-black p-2 text-left">Tanggal & Waktu</th>
+                                <th className="border border-black p-2 text-left">Jenis</th>
+                                <th className="border border-black p-2 text-left">Isi Laporan</th>
+                                <th className="border border-black p-2 text-left">Aktivitas</th>
+                                <th className="border border-black p-2 text-left">Foto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {riwayatLaporan.map((laporan, index) => (
+                                <tr key={laporan.id}>
+                                    <td className="border border-black p-2 text-center">{index + 1}</td>
+                                    <td className="border border-black p-2">
+                                        {new Date(laporan.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        <br/>
+                                        <span className="text-xs text-gray-600">
+                                            {laporan.created_at ? new Date(laporan.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                        </span>
+                                    </td>
+                                    <td className="border border-black p-2">
+                                        {laporan.checklist_json?.type === 'EMERGENCY' ? <span className="font-bold text-red-600">DARURAT</span> : 'Harian'}
+                                    </td>
+                                    <td className="border border-black p-2">{laporan.isi_laporan || '-'}</td>
+                                    <td className="border border-black p-2">
+                                        {laporan.checklist_json && !laporan.checklist_json.type ? (
+                                            <ul className="list-disc list-inside text-xs">
+                                                {Object.entries(laporan.checklist_json).map(([key, val]) => (
+                                                    val && <li key={key} className="capitalize">{key.replace(/_/g, ' ')}</li>
+                                                ))}
+                                            </ul>
+                                        ) : '-'}
+                                    </td>
+                                    <td className="border border-black p-2 text-center">
+                                        {laporan.foto_bukti ? 'Ada' : '-'}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </>
         )}
 
       </div>
+
+      {/* CSS KHUSUS PRINT */}
+      <style>{`
+        @media print {
+            .no-print, nav, .fixed, .print\\:hidden { display: none !important; }
+            body { background: white; }
+            .min-h-screen { min-height: auto; padding-bottom: 0; }
+            .print\\:block { display: block !important; }
+            .print\\:border-black { border-color: #000 !important; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        }
+      `}</style>
     </div>
   );
 }
