@@ -1,6 +1,6 @@
 // c:\Users\dzikri\Downloads\absensi-app-user\client\src\pages\Login.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, User, Lock, ArrowRight } from 'lucide-react';
 import { API_BASE_URL } from '../config';
@@ -11,6 +11,14 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Auto Login jika sesi masih ada (User belum logout/scan pulang)
+    if (localStorage.getItem('user_data')) {
+      const hasAbsen = localStorage.getItem('absensi_data');
+      navigate(hasAbsen ? '/dashboard' : '/scan-masuk');
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -28,15 +36,57 @@ export default function Login() {
       const result = await response.json();
 
       if (response.ok && result.status === 'success') {
-        // Simpan data user dari DB ke localStorage
-        localStorage.setItem('user_data', JSON.stringify(result.data));
+        const userData = result.data;
 
-        // Hapus penanda scan hari sebelumnya agar bisa scan lagi
+        // --- VALIDASI: Cek apakah user ini sudah selesai shift hari ini ---
+        try {
+            const historyRes = await fetch(`${API_BASE_URL}/api/riwayat-absensi/${userData.id}`);
+            const historyData = await historyRes.json();
+            
+            if (historyData.status === 'success') {
+                // Gunakan Local Date untuk cek "Hari Ini" agar akurat (bukan UTC)
+                const today = new Date();
+                const todayRecord = historyData.data.find(row => {
+                    const rowDate = new Date(row.tanggal);
+                    return rowDate.toDateString() === today.toDateString();
+                });
+
+                if (todayRecord) {
+                    if (todayRecord.jam_pulang) {
+                        setError(`⛔ AKSES DITOLAK: ${userData.nama}, Anda sudah menyelesaikan shift hari ini.`);
+                        setLoading(false);
+                        return; // STOP LOGIN
+                    } else {
+                        // Kasus: Sudah scan masuk, tapi belum scan pulang (Resume Session)
+                        // Kita restore data absensi ke localStorage agar Dashboard bisa render
+                        const resumedAbsensiData = {
+                            user_id: userData.id,
+                            ...userData,
+                            jamMasuk: todayRecord.jam_masuk.substring(0, 5) + " WIB",
+                            tanggal: new Date(todayRecord.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+                            lokasi: todayRecord.lokasi,
+                            shift: todayRecord.shift,
+                            status: todayRecord.status,
+                            isLate: todayRecord.is_late === 1,
+                            qrCode: todayRecord.qr_code_data
+                        };
+                        localStorage.setItem('absensi_data', JSON.stringify(resumedAbsensiData));
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Gagal validasi history:", err);
+        }
+
+        // Simpan data user & Bersihkan flag lokal lama
+        localStorage.setItem('user_data', JSON.stringify(userData));
         localStorage.removeItem('last_scan_date');
         localStorage.removeItem('has_scanned_out');
 
         // Arahkan ke scan masuk
-        navigate('/scan-masuk');
+        const hasAbsen = localStorage.getItem('absensi_data');
+        navigate(hasAbsen ? '/dashboard' : '/scan-masuk');
+
       } else {
         setError(result.message || 'Terjadi kesalahan');
       }

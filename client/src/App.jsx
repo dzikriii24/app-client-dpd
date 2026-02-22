@@ -17,11 +17,22 @@ import Help from './pages/Help';
 import About from './pages/About';
 
 export default function App() {
+  // Helper untuk cek sesi login yang tersimpan
+  const AuthCheck = () => {
+    const userData = localStorage.getItem('user_data');
+    const absensiData = localStorage.getItem('absensi_data');
+    
+    if (userData) {
+      return absensiData ? <Navigate to="/dashboard" /> : <Navigate to="/scan-masuk" />;
+    }
+    return <Navigate to="/login" />;
+  };
+
   return (
     <Router>
       <Routes>
         {/* Flow Awal: Login -> Scan Masuk */}
-        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/" element={<AuthCheck />} />
         <Route path="/login" element={<Login />} />
         
         {/* Halaman Generator QR (Untuk Testing/Admin) */}

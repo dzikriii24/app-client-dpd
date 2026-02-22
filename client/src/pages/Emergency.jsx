@@ -108,7 +108,7 @@ export default function Emergency() {
                 {loading ? 'Mengirim...' : (
                     <>
                         <Send size={18} />
-                        Kirim Sinyal Darurat
+                        Kirim Laporan Darurat
                     </>
                 )}
             </button>

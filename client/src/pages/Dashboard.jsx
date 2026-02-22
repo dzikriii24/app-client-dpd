@@ -1,7 +1,7 @@
 // c:\Users\dzikri\Downloads\absensi-app-user\client\src\pages\Dashboard.jsx
 
 import React, { useEffect, useState } from 'react';
-import { MapPin, Clock, CalendarCheck, FileText, Camera, CheckSquare, AlertTriangle, Upload } from 'lucide-react';
+import { MapPin, Clock, CalendarCheck, FileText, Camera, CheckSquare, AlertTriangle, Upload, BellRing } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
@@ -12,6 +12,10 @@ export default function Dashboard() {
   const [timeRemaining, setTimeRemaining] = useState("");
   const [shiftEndTime, setShiftEndTime] = useState("");
   const [hasSubmittedReport, setHasSubmittedReport] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // GANTI DENGAN PUBLIC KEY DARI TERMINAL (Langkah 1)
+  const publicVapidKey = 'BHPiVWZRGOAbki8WcDeQseoWHdbzE26wv9Ce00wccvrViehc2o2QqtHLdbDaq0ggVL9nhY1Pb6IrMyxKZ6fZiaE';
   
   // State untuk Laporan
   const [checklist, setChecklist] = useState({
@@ -22,6 +26,46 @@ export default function Dashboard() {
   });
   const [keterangan, setKeterangan] = useState("");
   const [foto, setFoto] = useState(null);
+
+  // --- FUNGSI SUBSCRIBE NOTIFIKASI ---
+  const subscribeToPush = async (userId) => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+            const register = await navigator.serviceWorker.ready;
+            
+            // Minta Izin
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') return;
+
+            // Konversi Key
+            const urlBase64ToUint8Array = (base64String) => {
+                const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                const rawData = window.atob(base64);
+                const outputArray = new Uint8Array(rawData.length);
+                for (let i = 0; i < rawData.length; ++i) {
+                    outputArray[i] = rawData.charCodeAt(i);
+                }
+                return outputArray;
+            };
+
+            // Subscribe ke Browser
+            const subscription = await register.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+            });
+
+            // Kirim ke Server Database
+            await fetch(`${API_BASE_URL}/api/subscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, subscription })
+            });
+        } catch (err) {
+            console.error("Gagal subscribe push:", err);
+        }
+    }
+  };
 
   // Efek Jam Realtime
   useEffect(() => {
@@ -70,6 +114,21 @@ export default function Dashboard() {
       const lastReport = localStorage.getItem('daily_report_date');
       if (lastReport === new Date().toLocaleDateString('id-ID')) {
           setHasSubmittedReport(true);
+      }
+
+      // Fetch Notifikasi Count
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+      if (userData.id) {
+        fetch(`${API_BASE_URL}/api/notifications/${userData.id}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    setUnreadCount(data.data.filter(n => !n.is_read).length);
+                }
+            });
+        
+        // Jalankan Subscribe Push Notification
+        subscribeToPush(userData.id);
       }
   }, [navigate, currentTime]);
 
@@ -140,7 +199,15 @@ export default function Dashboard() {
                 <h1 className="text-xl font-bold">{displayData.nama}</h1>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs bg-red-800 px-2 py-0.5 rounded text-red-100">{displayData.role}</span>
-                    {/* Jam Realtime */}
+                    
+                    {/* Tombol Notifikasi di Header (Pojok Kanan) */}
+                    <button onClick={() => navigate('/notifications')} className="bg-red-800 p-1.5 rounded-full text-red-100 hover:bg-red-900 relative">
+                        <BellRing size={12} />
+                        {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full border border-red-700">{unreadCount}</span>
+                        )}
+                    </button>
+
                     <span className="text-xs font-mono bg-white/20 px-2 py-0.5 rounded text-white">{currentTime.toLocaleTimeString('id-ID')}</span>
                 </div>
             </div>

@@ -1,32 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Settings, LogOut, ChevronRight, Bell, Lock, HelpCircle } from 'lucide-react';
+import { User, Settings, ChevronRight, Bell, Lock, HelpCircle } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function Profile() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const userDataString = localStorage.getItem('user_data');
     if (userDataString) {
-      setUser(JSON.parse(userDataString));
+      const userData = JSON.parse(userDataString);
+      setUser(userData);
+
+      // Fetch Notifikasi Count
+      fetch(`${API_BASE_URL}/api/notifications/${userData.id}`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                setUnreadCount(data.data.filter(n => !n.is_read).length);
+            }
+        });
     } else {
       // Jika tidak ada data user, tendang ke login
       navigate('/login');
     }
   }, [navigate]);
-
-  const handleLogout = () => {
-    // Hapus semua data sesi dari localStorage untuk logout bersih
-    localStorage.removeItem('user_data');
-    localStorage.removeItem('absensi_data');
-    localStorage.removeItem('last_scan_date');
-    localStorage.removeItem('has_scanned_out');
-    localStorage.removeItem('daily_report_date');
-
-    // Arahkan kembali ke login
-    navigate('/login');
-  };
 
   // Tampilkan loading jika data user belum siap
   if (!user) {
@@ -73,7 +73,7 @@ export default function Profile() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <MenuItem icon={<User size={18} />} label="Edit Profil" onClick={() => navigate('/profile/edit')} />
                 <MenuItem icon={<Lock size={18} />} label="Ganti Password" onClick={() => navigate('/change-password')} />
-                <MenuItem icon={<Bell size={18} />} label="Notifikasi" badge="2" onClick={() => navigate('/notifications')} />
+                <MenuItem icon={<Bell size={18} />} label="Notifikasi" badge={unreadCount > 0 ? unreadCount : null} onClick={() => navigate('/notifications')} />
             </div>
         </div>
 
@@ -86,15 +86,6 @@ export default function Profile() {
             </div>
         </div>
 
-        {/* 3. Tombol Logout */}
-        <button 
-            onClick={handleLogout}
-            className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors active:scale-95 border border-red-100"
-        >
-            <LogOut size={20} />
-            Keluar Aplikasi
-        </button>
-        
         <p className="text-center text-xs text-slate-300 pb-4">Version 1.0.0 Beta</p>
       </div>
 

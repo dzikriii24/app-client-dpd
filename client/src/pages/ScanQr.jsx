@@ -51,6 +51,39 @@ export default function ScanQR({ type }) {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
+
+    // --- VALIDASI JAM PULANG: Hanya boleh scan jika shift sudah selesai ---
+    if (type === 'pulang') {
+        const storedAbsen = localStorage.getItem('absensi_data');
+        if (storedAbsen) {
+            const absenData = JSON.parse(storedAbsen);
+            const userShift = absenData.shift; // Shift saat Masuk (Pagi/Siang/Malam)
+            
+            let canGoHome = true;
+            let jadwalPulang = "";
+
+            if (userShift === "Shift Pagi") { // 07:00 - 15:00
+                jadwalPulang = "15:00";
+                if (currentHour < 15) canGoHome = false;
+            } 
+            else if (userShift === "Shift Siang") { // 15:00 - 23:00
+                jadwalPulang = "23:00";
+                // Gaboleh pulang jika jam 15 s/d 22
+                if (currentHour >= 15 && currentHour < 23) canGoHome = false;
+            } 
+            else if (userShift === "Shift Malam") { // 23:00 - 07:00
+                jadwalPulang = "07:00";
+                // Gaboleh pulang jika jam 18 s/d 23 ATAU 00 s/d 06
+                if (currentHour >= 18 || currentHour < 7) canGoHome = false;
+            }
+
+            if (!canGoHome) {
+                alert(`⛔ BELUM WAKTUNYA PULANG!\n\nAnda terdaftar di ${userShift}.\nJadwal pulang: Jam ${jadwalPulang}.\nSekarang masih jam ${currentHour}:${currentMinute.toString().padStart(2, '0')}.`);
+                navigate('/dashboard');
+                return;
+            }
+        }
+    }
     
     let shiftName = "Shift Malam";
     let shiftStartHour = 23;
@@ -95,6 +128,9 @@ export default function ScanQR({ type }) {
     // Efek Getar HP (Haptic Feedback) jika didukung browser
     if (navigator.vibrate) navigator.vibrate(200);
 
+    // Format Tanggal YYYY-MM-DD (Local Time) agar konsisten dengan Login
+    const localDateYMD = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
     if (type === 'masuk') {
         // 1. Simpan ke LocalStorage (untuk UI cepat)
         localStorage.setItem('absensi_data', JSON.stringify(absensiData));
@@ -107,7 +143,7 @@ export default function ScanQR({ type }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: userData.id,
-                    tanggal: now.toISOString().split('T')[0], // Format YYYY-MM-DD
+                    tanggal: localDateYMD,
                     jam_masuk: now.toLocaleTimeString('en-GB'), // Format HH:MM:SS
                     shift: shiftName,
                     status: status,
@@ -130,7 +166,7 @@ export default function ScanQR({ type }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_id: userData.id,
-                tanggal: now.toISOString().split('T')[0],
+                tanggal: localDateYMD,
                 jam_pulang: now.toLocaleTimeString('en-GB')
             })
         });
@@ -138,6 +174,7 @@ export default function ScanQR({ type }) {
         localStorage.setItem('has_scanned_out', todayStr);
         // Hapus data absen biar besok bersih, atau simpan ke history (disini kita hapus sesi aktif aja)
         localStorage.removeItem('absensi_data'); 
+        localStorage.removeItem('user_data'); // Hapus sesi user agar tidak bisa login lagi hari ini
         setTimeout(() => {
             alert("✅ Absen Pulang Berhasil! Hati-hati di jalan.");
             navigate('/login'); // Arahkan ke login setelah absen pulang
@@ -158,8 +195,8 @@ export default function ScanQR({ type }) {
             // Config agar kamera tajam & full screen
             const config = { 
                 fps: 15, // Frame per second lebih tinggi biar smooth
-                qrbox: { width: 250, height: 250 }, // Kotak fokus scanning
-                aspectRatio: window.innerHeight / window.innerWidth, // Rasio layar HP (Portrait)
+                qrbox: { width: 300, height: 300 }, // Area scan dibuat lebih besar dari visual agar responsif
+                // aspectRatio dihapus agar library menyesuaikan resolusi asli kamera (anti-gepeng)
                 videoConstraints: {
                     facingMode: "environment", // Kamera Belakang
                     focusMode: "continuous" // Autofocus
@@ -239,23 +276,20 @@ export default function ScanQR({ type }) {
         {/* OVERLAY VISUAL (Agar kamera tidak terlihat kotak doang) */}
         {!isError && (
             <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center">
-                
-                {/* Overlay Gelap di sekeliling kotak */}
-                <div className="absolute inset-0 bg-black/40 mask-scan"></div>
 
-                {/* Kotak Fokus Scanner */}
-                <div className="w-72 h-72 relative z-20">
+                {/* Kotak Fokus Scanner dengan Shadow Overlay (Teknik Lubang) */}
+                <div className="w-72 h-72 relative z-20 mt-18 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] overflow-hidden">
                     {/* Sudut Merah Elegan */}
-                    <div className="absolute top-0 left-0 w-12 h-12 border-t-[6px] border-l-[6px] border-red-500 rounded-tl-3xl"></div>
-                    <div className="absolute top-0 right-0 w-12 h-12 border-t-[6px] border-r-[6px] border-red-500 rounded-tr-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-12 h-12 border-b-[6px] border-l-[6px] border-red-500 rounded-bl-3xl"></div>
-                    <div className="absolute bottom-0 right-0 w-12 h-12 border-b-[6px] border-r-[6px] border-red-500 rounded-br-3xl"></div>
+                    <div className="absolute top-0 left-0 w-16 h-16 border-t-[6px] border-l-[6px] border-red-500 rounded-tl-3xl"></div>
+                    <div className="absolute top-0 right-0 w-16 h-16 border-t-[6px] border-r-[6px] border-red-500 rounded-tr-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-16 h-16 border-b-[6px] border-l-[6px] border-red-500 rounded-bl-3xl"></div>
+                    <div className="absolute bottom-0 right-0 w-16 h-16 border-b-[6px] border-r-[6px] border-red-500 rounded-br-3xl"></div>
                     
                     {/* Animasi Laser Scan */}
-                    <div className="absolute w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_20px_rgba(239,68,68,1)] animate-scan"></div>
+                    <div className="absolute w-full h-16 bg-gradient-to-b from-red-500/50 to-transparent animate-scan top-0 border-t-2 border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.6)]"></div>
                 </div>
 
-                <p className="text-white/80 mt-10 text-sm font-medium bg-black/30 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 animate-pulse">
+                <p className="text-white/90 mt-8 text-sm font-medium bg-black/40 px-5 py-2.5 rounded-full backdrop-blur-md border border-white/10 animate-pulse tracking-wide shadow-lg">
                     Arahkan kamera ke QR Code
                 </p>
             </div>
@@ -298,10 +332,9 @@ export default function ScanQR({ type }) {
       <style>{`
         /* Animasi Laser Naik Turun */
         @keyframes scan {
-          0% { top: 5%; opacity: 0; }
-          20% { opacity: 1; }
-          80% { opacity: 1; }
-          100% { top: 95%; opacity: 0; }
+          0% { top: 0%; opacity: 0; }
+          10% { opacity: 1; }
+          100% { top: 100%; opacity: 0; }
         }
         .animate-scan {
             animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
